@@ -24,6 +24,9 @@
     <ClInclude Include="AudioCapture.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="AACEncoder.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -36,6 +39,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="AudioCapture.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="AACEncoder.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

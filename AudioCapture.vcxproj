@@ -92,10 +92,12 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <AdditionalIncludeDirectories>.\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>.\lib\debug</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -152,11 +154,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="AACEncoder.h" />
     <ClInclude Include="CWaveFile.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="AudioCapture.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="AACEncoder.cpp" />
     <ClCompile Include="CWaveFile.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="pch.cpp">

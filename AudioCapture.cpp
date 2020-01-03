@@ -2,14 +2,15 @@
 #include "AudioCapture.h"
 #include "CWaveFile.h"
 #include <iostream>
+#include "AACEncoder.h"
 
-AudioCapture::AudioCapture()
+AudioCapture::AudioCapture() :m_aacEncoder(nullptr)
 {
 	for (size_t i = 0; i < 3; i++)
 	{
-		m_notifyEvents[i]= CreateEvent(NULL, TRUE, FALSE, NULL);
+		m_notifyEvents[i] = CreateEvent(NULL, TRUE, FALSE, NULL);
 	}
-}
+}  
 
 AudioCapture::~AudioCapture()
 {
@@ -17,6 +18,7 @@ AudioCapture::~AudioCapture()
 	{
 		CloseHandle(m_notifyEvents[i]);
 	}
+	delete m_aacEncoder;
 }
 
 BOOL CALLBACK AudioCapture::cb(LPGUID id, LPCWSTR desc, LPCWSTR mode, LPVOID context)
@@ -110,6 +112,8 @@ int AudioCapture::Init(DWORD sampleRate)
 	dsbNotify[2].dwOffset = DSBPN_OFFSETSTOP;
 	dsbNotify[2].hEventNotify = m_notifyEvents[2];
 	hr = soundNotify->SetNotificationPositions(3, dsbNotify);
+
+	m_aacEncoder = new AACEncoder();
 	return 0;
 }
 
@@ -117,6 +121,10 @@ int AudioCapture::Start()
 {
 	if (!m_capFunc.valid())
 		m_capFunc = std::async(std::launch::async, &AudioCapture::wrapRun, this);
+
+	if (!m_encFunc.valid())
+		m_encFunc = std::async(std::launch::async, &AudioCapture::wrapEncode, this);
+
 	return 0;
 }
 
@@ -186,10 +194,13 @@ unsigned AudioCapture::wrapRun()
 		}
 		else
 		{
-			g_pWaveFile.Write(dwCaptureLength, (BYTE*)pbCaptureData, &writeBytes);
+			std::lock_guard<std::mutex> lck(m_queueLock);
+			m_rawQueue.push(std::basic_string<uint8_t>((uint8_t*)pbCaptureData, dwCaptureLength));
+			//g_pWaveFile.Write(dwCaptureLength, (BYTE*)pbCaptureData, &writeBytes);
 			if (pbCaptureData2)
 			{
-				g_pWaveFile.Write(dwCaptureLength2, (BYTE*)pbCaptureData2, &writeBytes);
+				m_rawQueue.push(std::basic_string<uint8_t>((uint8_t*)pbCaptureData2, dwCaptureLength2));
+				//g_pWaveFile.Write(dwCaptureLength2, (BYTE*)pbCaptureData2, &writeBytes);
 			}
 		}
 		m_soundCapBuffer->Unlock(pbCaptureData, dwCaptureLength, pbCaptureData2, dwCaptureLength2);
@@ -203,10 +214,34 @@ unsigned AudioCapture::wrapRun()
 	return 0;
 }
 
+unsigned AudioCapture::wrapEncode()
+{
+	while (true)
+	{
+		std::unique_lock<std::mutex> lck(m_queueLock, std::adopt_lock);
+		if (m_rawQueue.empty())
+			m_queueCond.wait(lck);
+		if (m_rawQueue.empty())
+			break;
+		auto obj = m_rawQueue.front();
+		m_rawQueue.pop();
+		lck.unlock();
+		
+		m_aacEncoder->InputRawData(obj.c_str(), obj.size());
+	}
+	return 0;
+}
+
 void AudioCapture::Stop()
 {
 	SetEvent(m_notifyEvents[2]);
 	m_soundCapBuffer->Stop();
+
+	m_queueCond.notify_one();
+
 	if (m_capFunc.valid())
 		m_capFunc.wait();
+
+	if (m_encFunc.valid())
+		m_encFunc.wait();
 }
