@@ -10,6 +10,9 @@ AudioCapture::AudioCapture() :m_aacEncoder(nullptr)
 	{
 		m_notifyEvents[i] = CreateEvent(NULL, TRUE, FALSE, NULL);
 	}
+
+	InitializeCriticalSection(&m_lck);
+	InitializeConditionVariable(&m_con);
 }  
 
 AudioCapture::~AudioCapture()
@@ -114,6 +117,7 @@ int AudioCapture::Init(DWORD sampleRate)
 	hr = soundNotify->SetNotificationPositions(3, dsbNotify);
 
 	m_aacEncoder = new AACEncoder();
+	m_aacEncoder->Init(sampleRate, 2, 16);
 	return 0;
 }
 
@@ -194,14 +198,22 @@ unsigned AudioCapture::wrapRun()
 		}
 		else
 		{
-			std::lock_guard<std::mutex> lck(m_queueLock);
-			m_rawQueue.push(std::basic_string<uint8_t>((uint8_t*)pbCaptureData, dwCaptureLength));
-			//g_pWaveFile.Write(dwCaptureLength, (BYTE*)pbCaptureData, &writeBytes);
-			if (pbCaptureData2)
+			//std::cout << lLockSize << "--" << dwCaptureLength << std::endl;
 			{
-				m_rawQueue.push(std::basic_string<uint8_t>((uint8_t*)pbCaptureData2, dwCaptureLength2));
-				//g_pWaveFile.Write(dwCaptureLength2, (BYTE*)pbCaptureData2, &writeBytes);
+				//std::lock_guard<std::mutex> lck(m_queueLock);
+				EnterCriticalSection(&m_lck);
+				m_rawQueue.push(std::basic_string<uint8_t>((uint8_t*)pbCaptureData, dwCaptureLength));
+				//g_pWaveFile.Write(dwCaptureLength, (BYTE*)pbCaptureData, &writeBytes);
+				if (pbCaptureData2)
+				{
+					m_rawQueue.push(std::basic_string<uint8_t>((uint8_t*)pbCaptureData2, dwCaptureLength2));
+
+					//g_pWaveFile.Write(dwCaptureLength2, (BYTE*)pbCaptureData2, &writeBytes);
+				}
+				LeaveCriticalSection(&m_lck);
 			}
+			WakeConditionVariable(&m_con);
+			//m_queueCond.notify_one();
 		}
 		m_soundCapBuffer->Unlock(pbCaptureData, dwCaptureLength, pbCaptureData2, dwCaptureLength2);
 
@@ -218,14 +230,13 @@ unsigned AudioCapture::wrapEncode()
 {
 	while (true)
 	{
-		std::unique_lock<std::mutex> lck(m_queueLock, std::adopt_lock);
+		EnterCriticalSection(&m_lck);
 		if (m_rawQueue.empty())
-			m_queueCond.wait(lck);
-		if (m_rawQueue.empty())
-			break;
+			SleepConditionVariableCS(&m_con, &m_lck, INFINITE);
+	
 		auto obj = m_rawQueue.front();
 		m_rawQueue.pop();
-		lck.unlock();
+		LeaveCriticalSection(&m_lck);
 		
 		m_aacEncoder->InputRawData(obj.c_str(), obj.size());
 	}
