@@ -37,11 +37,9 @@ private:
 	HANDLE m_notifyEvents[3];
 private:
 	AACEncoder* m_aacEncoder;
-	std::mutex m_queueLock;
-	std::condition_variable m_queueCond;
 	std::queue <std::basic_string<uint8_t>> m_rawQueue;
 
 	CRITICAL_SECTION m_lck;
-	CONDITION_VARIABLE m_con;
+	CONDITION_VARIABLE m_cond;
 };
 

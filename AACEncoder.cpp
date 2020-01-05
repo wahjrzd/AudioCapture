@@ -18,45 +18,41 @@ AACEncoder::~AACEncoder()
 	fclose(pf);
 }
 
-int AACEncoder::Init(unsigned sampleRate, unsigned short channels, unsigned short deepth)
+int AACEncoder::Init(unsigned sampleRate, unsigned short channels, unsigned short bitDeepth)
 {
 	m_encHandle = faacEncOpen(sampleRate, channels, &m_inputSamples, &m_maxOutputBytes);
 	if (!m_encHandle)
 		return 1;
 	auto conf = faacEncGetCurrentConfiguration(m_encHandle);
 	conf->aacObjectType = LOW;
-	switch (deepth)
-	{
-	case 16:
-		conf->inputFormat = FAAC_INPUT_16BIT; break;
-	default:
-		break;
-	}
+	conf->inputFormat = FAAC_INPUT_16BIT;
 	conf->useLfe = 0;
-	conf->useTns = 1;
+	conf->useTns = 0;
 	conf->outputFormat = 1;
 	conf->allowMidside = 0;
-	conf->bitRate = sampleRate / 2;
+	conf->bitRate = sampleRate * channels * bitDeepth / 8;
+	conf->bandWidth = 0;
+	conf->shortctl = SHORTCTL_NORMAL;
 	faacEncSetConfiguration(m_encHandle, conf);
 	
-	m_outputBuffer = new unsigned char[m_maxOutputBytes + 1024];
-	m_bufferPool = new unsigned char[sampleRate*channels*deepth / 8];
-	//m_bufferPool = new unsigned char[m_inputSamples*channels*deepth];
+	m_outputBuffer = new unsigned char[m_maxOutputBytes];
+	m_bufferPool = new unsigned char[sampleRate*channels*bitDeepth / 8];
+	m_inputBytes = m_inputSamples * bitDeepth / 8;
 	return 0;
 }
 
 int AACEncoder::InputRawData(const uint8_t* pcmData, size_t sz)
 {
-	int ret;
+	int ret = 0;
 	memcpy(m_bufferPool + m_offset, pcmData, sz);
 	m_validSize += sz + m_offset;
-	auto pp = m_inputSamples * 16 / 8;
-	auto quo = m_validSize / pp;
-	auto rem = m_validSize % pp;
+	
+	auto quo = m_validSize / m_inputBytes;
+	auto rem = m_validSize % m_inputBytes;
 
 	for (size_t i = 0; i < quo; i++)
 	{
-		ret = faacEncEncode(m_encHandle, (int32_t*)(m_bufferPool + i * pp),
+		ret = faacEncEncode(m_encHandle, (int32_t*)(m_bufferPool + i * m_inputBytes),
 			m_inputSamples, m_outputBuffer, m_maxOutputBytes);
 		if (ret < 0)
 		{
@@ -69,16 +65,16 @@ int AACEncoder::InputRawData(const uint8_t* pcmData, size_t sz)
 		}
 		else
 		{
-			std::cout << ret << std::endl;
-			//TODO
+
 			fwrite(m_outputBuffer, 1, ret, pf);
 		}
 	}
 
 	m_validSize = rem;
-	m_offset += rem;
+	m_offset = rem;
+
 	if (rem != 0)
-		memmove(m_bufferPool, m_bufferPool + quo * pp, rem);
+		memmove(m_bufferPool, m_bufferPool + quo * m_inputBytes, rem);
 	return 0;
 }
 

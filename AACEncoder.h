@@ -8,7 +8,7 @@ public:
 	AACEncoder();
 	~AACEncoder();
 
-	int Init(unsigned sampleRate, unsigned short channels, unsigned short deepth);
+	int Init(unsigned sampleRate, unsigned short channels, unsigned short bitDeepth);
 
 	int InputRawData(const uint8_t* pcmData, size_t sz);
 
@@ -21,6 +21,7 @@ private:
 	faacEncHandle m_encHandle;
 	unsigned long m_inputSamples;
 	unsigned long m_maxOutputBytes;
+	unsigned int m_inputBytes;
 	FILE* pf;
 };
 

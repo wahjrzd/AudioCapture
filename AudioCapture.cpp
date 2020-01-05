@@ -12,7 +12,7 @@ AudioCapture::AudioCapture() :m_aacEncoder(nullptr)
 	}
 
 	InitializeCriticalSection(&m_lck);
-	InitializeConditionVariable(&m_con);
+	InitializeConditionVariable(&m_cond);
 }  
 
 AudioCapture::~AudioCapture()
@@ -21,6 +21,7 @@ AudioCapture::~AudioCapture()
 	{
 		CloseHandle(m_notifyEvents[i]);
 	}
+	DeleteCriticalSection(&m_lck);
 	delete m_aacEncoder;
 }
 
@@ -142,11 +143,10 @@ unsigned AudioCapture::wrapRun()
 	DWORD dwCaptureLength2;
 	DWORD dwReadPos;
 	DWORD nextOffset = 0;
-	UINT writeBytes;
 	LONG lLockSize;
 	DWORD dwRet;
 
-	CWaveFile g_pWaveFile;
+	/*CWaveFile g_pWaveFile;
 	WAVEFORMATEX  wfxInput;
 
 	ZeroMemory(&wfxInput, sizeof(wfxInput));
@@ -164,6 +164,8 @@ unsigned AudioCapture::wrapRun()
 		std::clog << "wave file open failed" << std::endl;
 		return 1;
 	}
+	g_pWaveFile.Close();*/
+
 	std::clog << "start capture audio data..." << std::endl;
 
 	hr = m_soundCapBuffer->Start(DSCBSTART_LOOPING);
@@ -198,9 +200,7 @@ unsigned AudioCapture::wrapRun()
 		}
 		else
 		{
-			//std::cout << lLockSize << "--" << dwCaptureLength << std::endl;
 			{
-				//std::lock_guard<std::mutex> lck(m_queueLock);
 				EnterCriticalSection(&m_lck);
 				m_rawQueue.push(std::basic_string<uint8_t>((uint8_t*)pbCaptureData, dwCaptureLength));
 				//g_pWaveFile.Write(dwCaptureLength, (BYTE*)pbCaptureData, &writeBytes);
@@ -212,8 +212,7 @@ unsigned AudioCapture::wrapRun()
 				}
 				LeaveCriticalSection(&m_lck);
 			}
-			WakeConditionVariable(&m_con);
-			//m_queueCond.notify_one();
+			WakeConditionVariable(&m_cond);
 		}
 		m_soundCapBuffer->Unlock(pbCaptureData, dwCaptureLength, pbCaptureData2, dwCaptureLength2);
 
@@ -222,7 +221,7 @@ unsigned AudioCapture::wrapRun()
 		nextOffset += dwCaptureLength2;
 		nextOffset %= m_bufferBytes;
 	}
-	g_pWaveFile.Close();
+	
 	return 0;
 }
 
@@ -232,8 +231,10 @@ unsigned AudioCapture::wrapEncode()
 	{
 		EnterCriticalSection(&m_lck);
 		if (m_rawQueue.empty())
-			SleepConditionVariableCS(&m_con, &m_lck, INFINITE);
-	
+			SleepConditionVariableCS(&m_cond, &m_lck, INFINITE);
+		if (m_rawQueue.empty())
+			break;
+
 		auto obj = m_rawQueue.front();
 		m_rawQueue.pop();
 		LeaveCriticalSection(&m_lck);
@@ -248,7 +249,7 @@ void AudioCapture::Stop()
 	SetEvent(m_notifyEvents[2]);
 	m_soundCapBuffer->Stop();
 
-	m_queueCond.notify_one();
+	WakeConditionVariable(&m_cond);
 
 	if (m_capFunc.valid())
 		m_capFunc.wait();
