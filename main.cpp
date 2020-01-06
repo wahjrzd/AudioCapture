@@ -6,6 +6,7 @@
 #pragma comment(lib, "dsound.lib")
 #pragma comment(lib, "winmm.lib")
 #pragma comment(lib, "libfaac.lib")
+#pragma comment(lib, "libspeex.lib")
 
 int main()
 {

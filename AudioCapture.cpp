@@ -38,7 +38,7 @@ int AudioCapture::Init(DWORD sampleRate)
 
 	HRESULT hr;
 	DirectSoundCaptureEnumerate(cb, this);
-
+	
 	if (m_capGuids.size() < 2)
 		hr = DirectSoundCaptureCreate8(NULL, &m_soundCap, NULL);
 	else
@@ -256,4 +256,6 @@ void AudioCapture::Stop()
 
 	if (m_encFunc.valid())
 		m_encFunc.wait();
+
+	m_aacEncoder->FlushEncoder();
 }

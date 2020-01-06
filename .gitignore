@@ -261,3 +261,5 @@ __pycache__/
 *.pyc
 /test.wav
 /1.aac
+/include/speex/Makefile.in
+/include/speex/Makefile.am

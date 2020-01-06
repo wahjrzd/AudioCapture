@@ -158,6 +158,7 @@
     <ClInclude Include="CWaveFile.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="AudioCapture.h" />
+    <ClInclude Include="SpeexEncoder.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AACEncoder.cpp" />
@@ -170,6 +171,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="AudioCapture.cpp" />
+    <ClCompile Include="SpeexEncoder.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
